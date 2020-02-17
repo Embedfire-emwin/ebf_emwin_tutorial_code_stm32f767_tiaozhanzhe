@@ -61,7 +61,6 @@ static TaskHandle_t GUI_Task_Handle = NULL;
  * 来完成的
  * 
  */
-SemaphoreHandle_t ScreenShotSem_Handle = NULL;
  
 /******************************* 全局变量声明 ************************************/
 /*
@@ -127,7 +126,7 @@ static void AppTaskCreate(void)
 	BaseType_t xReturn = pdPASS;/* 定义一个创建信息返回值，默认为pdPASS */
 	
 	taskENTER_CRITICAL();//进入临界区
-	
+  
 	xReturn = xTaskCreate((TaskFunction_t)LED_Task,/* 任务入口函数 */
 											 (const char*    )"LED_Task",/* 任务名称 */
 											 (uint16_t       )128,       /* 任务栈大小 */
@@ -148,7 +147,7 @@ static void AppTaskCreate(void)
   
   xReturn = xTaskCreate((TaskFunction_t)GUI_Task,/* 任务入口函数 */
 											 (const char*      )"GUI_Task",/* 任务名称 */
-											 (uint16_t         )1024 * 16,      /* 任务栈大小 */
+											 (uint16_t         )1024*4,      /* 任务栈大小 */
 											 (void*            )NULL,      /* 任务入口函数参数 */
 											 (UBaseType_t      )3,         /* 任务的优先级 */
 											 (TaskHandle_t     )&GUI_Task_Handle);/* 任务控制块指针 */

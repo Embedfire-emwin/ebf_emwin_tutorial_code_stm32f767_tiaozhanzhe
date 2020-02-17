@@ -9,13 +9,19 @@
 #include "stm32f7xx.h"
 
 
-#define SD_CardInfo HAL_SD_CardInfoTypedef
+#define SD_CardInfo HAL_SD_CardInfoTypeDef
 
    
 #define MSD_OK                        ((uint8_t)0x00)
 #define MSD_ERROR                     ((uint8_t)0x01)
 
 #define SD_DATATIMEOUT           ((uint32_t)100000000)
+
+/**
+  * @brief  SD transfer state definition
+  */
+#define   SD_TRANSFER_OK                ((uint8_t)0x00)
+#define   SD_TRANSFER_BUSY              ((uint8_t)0x01)
     
 /* DMA definitions for SD DMA transfer */
 #define __DMAx_TxRx_CLK_ENABLE            __DMA2_CLK_ENABLE
@@ -36,15 +42,14 @@ void    BSP_SD_DetectIT(void);
 void    BSP_SD_DetectCallback(void);
 uint8_t BSP_SD_ReadBlocks(uint32_t *pData, uint64_t ReadAddr, uint32_t BlockSize, uint32_t NumOfBlocks);
 uint8_t BSP_SD_WriteBlocks(uint32_t *pData, uint64_t WriteAddr, uint32_t BlockSize, uint32_t NumOfBlocks);
-uint8_t BSP_SD_ReadBlocks_DMA(uint32_t *pData, uint64_t ReadAddr, uint32_t BlockSize, uint32_t NumOfBlocks);
-uint8_t BSP_SD_WriteBlocks_DMA(uint32_t *pData, uint64_t WriteAddr, uint32_t BlockSize, uint32_t NumOfBlocks);
+uint8_t BSP_SD_ReadBlocks_DMA(uint32_t *pData, uint64_t ReadAddr, uint32_t NumOfBlocks);
+uint8_t BSP_SD_WriteBlocks_DMA(uint32_t *pData, uint64_t WriteAddr, uint32_t NumOfBlocks);
 uint8_t BSP_SD_Erase(uint64_t StartAddr, uint64_t EndAddr);
 void    BSP_SD_IRQHandler(void);
 void    BSP_SD_DMA_Tx_IRQHandler(void);
 void    BSP_SD_DMA_Rx_IRQHandler(void);
-HAL_SD_TransferStateTypedef BSP_SD_GetStatus(void);
-void    BSP_SD_GetCardInfo(HAL_SD_CardInfoTypedef *CardInfo);
-uint8_t BSP_SD_IsDetected(void);
+uint8_t BSP_SD_GetCardState(void);
+void    BSP_SD_GetCardInfo(HAL_SD_CardInfoTypeDef *CardInfo);
 
 /* These functions can be modified in case the current settings (e.g. DMA stream)
    need to be changed for specific application needs */

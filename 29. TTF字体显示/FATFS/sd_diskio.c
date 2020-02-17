@@ -38,6 +38,11 @@
 /* Disk status */
 static volatile DSTATUS Stat = STA_NOINIT;
 
+//发送标志位
+extern volatile uint8_t TX_Flag;
+//接受标志位
+extern volatile uint8_t RX_Flag; 
+
 /* Private function prototypes -----------------------------------------------*/
 DSTATUS SD_initialize (BYTE);
 DSTATUS SD_status (BYTE);
@@ -92,7 +97,7 @@ DSTATUS SD_status(BYTE lun)
 {
   Stat = STA_NOINIT;
 
-  if(BSP_SD_GetStatus() == MSD_OK)
+  if(BSP_SD_GetCardState() == MSD_OK)
   {
     Stat &= ~STA_NOINIT;
   }
@@ -110,32 +115,43 @@ DSTATUS SD_status(BYTE lun)
   */
 DRESULT SD_read(BYTE lun, BYTE *buff, DWORD sector, UINT count)
 {
-    DRESULT res = RES_OK;
-  
-    if ((DWORD)buff & 3) 
-    {
-        DWORD scratch[BLOCK_SIZE / 4];
+  DRESULT res = RES_ERROR;
+  uint32_t timeout;
+  uint32_t alignedAddr;
 
-        while (count--) 
-        {
-            memcpy(scratch, buff, BLOCK_SIZE);
-            res = SD_read(lun,(void *)scratch, sector++, 1);
-            
-            if (res != RES_OK)
-            {
-               break;
-            }
-            buff += BLOCK_SIZE;
-        }
+  RX_Flag = 0;
 
-        return(res);
-     }
-  if(BSP_SD_ReadBlocks((uint32_t*)buff, 
-                       (uint64_t) (sector * BLOCK_SIZE), 
-                       BLOCK_SIZE, 
-                       count) != MSD_OK)
+  if(BSP_SD_ReadBlocks_DMA((uint32_t*)buff,
+                           (uint32_t) (sector),
+                           count) == HAL_OK)
   {
-    res = RES_ERROR;
+    /* Wait that the reading process is completed or a timeout occurs */
+    timeout = HAL_GetTick();
+    while((RX_Flag == 0) && ((HAL_GetTick() - timeout) < SD_DATATIMEOUT))
+    {
+    }
+    /* incase of a timeout return error */
+    if (RX_Flag == 0)
+    {
+      res = RES_ERROR;
+    }
+    else
+    {
+      RX_Flag = 0;
+      timeout = HAL_GetTick();
+
+      while((HAL_GetTick() - timeout) < SD_DATATIMEOUT)
+      {
+        if (BSP_SD_GetCardState() == SD_TRANSFER_OK)
+        {
+          res = RES_OK;
+          alignedAddr = (uint32_t)buff & ~0x1F;
+          //使相应的DCache无效
+          SCB_InvalidateDCache_by_Addr((uint32_t*)alignedAddr, count*BLOCKSIZE + ((uint32_t)buff - alignedAddr));
+          break;
+        }
+      }
+    }
   }
   
   return res;
@@ -152,34 +168,50 @@ DRESULT SD_read(BYTE lun, BYTE *buff, DWORD sector, UINT count)
 #if _USE_WRITE == 1
 DRESULT SD_write(BYTE lun, const BYTE *buff, DWORD sector, UINT count)
 {
-    DRESULT res = RES_OK;
+  DRESULT res = RES_OK;
+	uint32_t alignedAddr;
+  uint32_t timeout;
+  TX_Flag = 1;
+
+  /*
+   the SCB_CleanDCache_by_Addr() requires a 32-Byte aligned address
+   adjust the address and the D-Cache size to clean accordingly.
+   */
+  alignedAddr = (uint32_t)buff &  ~0x1F;
+  //更新相应的DCache
+  SCB_CleanDCache_by_Addr((uint32_t*)alignedAddr, count*BLOCKSIZE + ((uint32_t)buff - alignedAddr));
   
-    if ((DWORD)buff & 3) 
-    {
-        DWORD scratch[BLOCK_SIZE / 4];
+  if(BSP_SD_WriteBlocks_DMA((uint32_t*)buff,
+                            (uint32_t)(sector),
+                            count) == MSD_OK)
+  {
+    /* Wait that writing process is completed or a timeout occurs */
 
-        while (count--) 
-        {
-            memcpy(scratch, buff, BLOCK_SIZE);
-            res = SD_write(lun,(void *)scratch, sector++, 1);
-            
-            if (res != RES_OK)
-            {
-               break;
-            }
-            buff += BLOCK_SIZE;
-        }
-
-        return(res);
-     }
-    if(BSP_SD_WriteBlocks((uint32_t*)buff, 
-                        (uint64_t)(sector * BLOCK_SIZE), 
-                        BLOCK_SIZE, count) != MSD_OK)
+    timeout = HAL_GetTick();
+    while((TX_Flag == 0) && ((HAL_GetTick() - timeout) < SD_DATATIMEOUT))
     {
-        res = RES_ERROR;
     }
-  
-    return res;
+    /* incase of a timeout return error */
+    if (TX_Flag == 0)
+    {
+      res = RES_ERROR;
+    }
+    else
+    {
+      TX_Flag = 0;
+      timeout = HAL_GetTick();
+
+      while((HAL_GetTick() - timeout) < SD_DATATIMEOUT)
+      {
+        if (BSP_SD_GetCardState() == SD_TRANSFER_OK)
+        {
+          res = RES_OK;
+          break;
+        }
+      }
+    }
+  }
+  return res;
 }   
 #endif /* _USE_WRITE == 1 */
 
@@ -208,7 +240,7 @@ DRESULT SD_ioctl(BYTE lun, BYTE cmd, void *buff)
   /* Get number of sectors on the disk (DWORD) */
   case GET_SECTOR_COUNT :
     BSP_SD_GetCardInfo(&CardInfo);
-    *(DWORD*)buff = CardInfo.CardCapacity / BLOCK_SIZE;
+    *(DWORD*)buff = CardInfo.LogBlockNbr;
     res = RES_OK;
     break;
   

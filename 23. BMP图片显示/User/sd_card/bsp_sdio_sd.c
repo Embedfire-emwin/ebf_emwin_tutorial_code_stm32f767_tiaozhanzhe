@@ -20,7 +20,11 @@
 #include "FreeRTOS.h"
 #include "task.h"
 static SD_HandleTypeDef uSdHandle;
-static SD_CardInfo      uSdCardInfo;
+
+//发送标志位
+volatile uint8_t TX_Flag=0;
+//接受标志位
+volatile uint8_t RX_Flag=0; 
 
 /**
   * @brief  禁用WIFI模块
@@ -70,7 +74,7 @@ uint8_t BSP_SD_Init(void)
   BSP_SD_MspInit(&uSdHandle, NULL);
 
   /* HAL SD 初始化 */
-  if(HAL_SD_Init(&uSdHandle, &uSdCardInfo) != SD_OK)
+  if(HAL_SD_Init(&uSdHandle) != HAL_OK)
   {
     sd_state = MSD_ERROR;
   }
@@ -79,7 +83,7 @@ uint8_t BSP_SD_Init(void)
   if(sd_state == MSD_OK)
   {
     /* 配置为4bit模式 */
-    if(HAL_SD_WideBusOperation_Config(&uSdHandle, SDMMC_BUS_WIDE_4B) != SD_OK)
+    if(HAL_SD_ConfigWideBusOperation(&uSdHandle, SDMMC_BUS_WIDE_4B) != HAL_OK)
     {
       sd_state = MSD_ERROR;
     }
@@ -125,7 +129,7 @@ uint8_t BSP_SD_DeInit(void)
   */
 uint8_t BSP_SD_ReadBlocks(uint32_t *pData, uint64_t ReadAddr, uint32_t BlockSize, uint32_t NumOfBlocks)
 {
-  if(HAL_SD_ReadBlocks(&uSdHandle, pData, ReadAddr, BlockSize, NumOfBlocks) != SD_OK)
+  if(HAL_SD_ReadBlocks(&uSdHandle, (uint8_t *)pData, ReadAddr, BlockSize, NumOfBlocks) != HAL_OK)
   {
     return MSD_ERROR;
   }
@@ -145,7 +149,7 @@ uint8_t BSP_SD_ReadBlocks(uint32_t *pData, uint64_t ReadAddr, uint32_t BlockSize
   */
 uint8_t BSP_SD_WriteBlocks(uint32_t *pData, uint64_t WriteAddr, uint32_t BlockSize, uint32_t NumOfBlocks)
 {
-  if(HAL_SD_WriteBlocks(&uSdHandle, pData, WriteAddr, BlockSize, NumOfBlocks) != SD_OK)
+  if(HAL_SD_WriteBlocks(&uSdHandle, (uint8_t *)pData, WriteAddr, BlockSize, NumOfBlocks) != HAL_OK)
   {
     return MSD_ERROR;
   }
@@ -163,27 +167,18 @@ uint8_t BSP_SD_WriteBlocks(uint32_t *pData, uint64_t WriteAddr, uint32_t BlockSi
   * @param  NumOfBlocks: Number of SD blocks to read 
   * @retval SD status
   */
-uint8_t BSP_SD_ReadBlocks_DMA(uint32_t *pData, uint64_t ReadAddr, uint32_t BlockSize, uint32_t NumOfBlocks)
+uint8_t BSP_SD_ReadBlocks_DMA(uint32_t *pData, uint64_t ReadAddr, uint32_t NumOfBlocks)
 {
   uint8_t sd_state = MSD_OK;
   
   /* Read block(s) in DMA transfer mode */
-  if(HAL_SD_ReadBlocks_DMA(&uSdHandle, pData, ReadAddr, BlockSize, NumOfBlocks) != SD_OK)
+  if(HAL_SD_ReadBlocks_DMA(&uSdHandle, (uint8_t *)pData, ReadAddr, NumOfBlocks) != HAL_OK)
   {
     sd_state = MSD_ERROR;
   }
-  
-  /* Wait until transfer is complete */
-  if(sd_state == MSD_OK)
+  else
   {
-    if(HAL_SD_CheckReadOperation(&uSdHandle, (uint32_t)SD_DATATIMEOUT) != SD_OK)
-    {
-      sd_state = MSD_ERROR;
-    }
-    else
-    {
-      sd_state = MSD_OK;
-    }
+    sd_state = MSD_OK;
   }
   
   return sd_state;
@@ -197,27 +192,18 @@ uint8_t BSP_SD_ReadBlocks_DMA(uint32_t *pData, uint64_t ReadAddr, uint32_t Block
   * @param  NumOfBlocks: Number of SD blocks to write 
   * @retval SD status
   */
-uint8_t BSP_SD_WriteBlocks_DMA(uint32_t *pData, uint64_t WriteAddr, uint32_t BlockSize, uint32_t NumOfBlocks)
+uint8_t BSP_SD_WriteBlocks_DMA(uint32_t *pData, uint64_t WriteAddr, uint32_t NumOfBlocks)
 {
   uint8_t sd_state = MSD_OK;
   
   /* Write block(s) in DMA transfer mode */
-  if(HAL_SD_WriteBlocks_DMA(&uSdHandle, pData, WriteAddr, BlockSize, NumOfBlocks) != SD_OK)
+  if(HAL_SD_WriteBlocks_DMA(&uSdHandle, (uint8_t *)pData, WriteAddr, NumOfBlocks) != HAL_OK)
   {
     sd_state = MSD_ERROR;
   }
-  
-  /* Wait until transfer is complete */
-  if(sd_state == MSD_OK)
+  else
   {
-    if(HAL_SD_CheckWriteOperation(&uSdHandle, (uint32_t)SD_DATATIMEOUT) != SD_OK)
-    {
-      sd_state = MSD_ERROR;
-    }
-    else
-    {
-      sd_state = MSD_OK;
-    }
+    sd_state = MSD_OK;
   }
   
   return sd_state;
@@ -231,7 +217,7 @@ uint8_t BSP_SD_WriteBlocks_DMA(uint32_t *pData, uint64_t WriteAddr, uint32_t Blo
   */
 uint8_t BSP_SD_Erase(uint64_t StartAddr, uint64_t EndAddr)
 {
-  if(HAL_SD_Erase(&uSdHandle, StartAddr, EndAddr) != SD_OK)
+  if(HAL_SD_Erase(&uSdHandle, StartAddr, EndAddr) != HAL_OK)
   {
     return MSD_ERROR;
   }
@@ -290,7 +276,7 @@ void BSP_SD_MspInit(SD_HandleTypeDef *hsd, void *Params)
   dma_rx_handle.Init.PeriphInc           = DMA_PINC_DISABLE;
   dma_rx_handle.Init.MemInc              = DMA_MINC_ENABLE;
   dma_rx_handle.Init.PeriphDataAlignment = DMA_PDATAALIGN_WORD;
-  dma_rx_handle.Init.MemDataAlignment    = DMA_MDATAALIGN_WORD;
+  dma_rx_handle.Init.MemDataAlignment    = DMA_MDATAALIGN_HALFWORD;
   dma_rx_handle.Init.Mode                = DMA_PFCTRL;
   dma_rx_handle.Init.Priority            = DMA_PRIORITY_VERY_HIGH;
   dma_rx_handle.Init.FIFOMode            = DMA_FIFOMODE_ENABLE;
@@ -315,7 +301,7 @@ void BSP_SD_MspInit(SD_HandleTypeDef *hsd, void *Params)
   dma_tx_handle.Init.PeriphInc           = DMA_PINC_DISABLE;
   dma_tx_handle.Init.MemInc              = DMA_MINC_ENABLE;
   dma_tx_handle.Init.PeriphDataAlignment = DMA_PDATAALIGN_WORD;
-  dma_tx_handle.Init.MemDataAlignment    = DMA_MDATAALIGN_WORD;
+  dma_tx_handle.Init.MemDataAlignment    = DMA_MDATAALIGN_HALFWORD;
   dma_tx_handle.Init.Mode                = DMA_PFCTRL;
   dma_tx_handle.Init.Priority            = DMA_PRIORITY_VERY_HIGH;
   dma_tx_handle.Init.FIFOMode            = DMA_FIFOMODE_ENABLE;
@@ -380,11 +366,11 @@ void BSP_SD_MspDeInit(SD_HandleTypeDef *hsd, void *Params)
   */
 void BSP_SD_IRQHandler(void)
 {
-		/* 进入临界段 */
-	taskENTER_CRITICAL();
+//		/* 进入临界段 */
+//	taskENTER_CRITICAL();
   HAL_SD_IRQHandler(&uSdHandle);
-		/* 进入临界段 */
-	taskEXIT_CRITICAL();
+//		/* 进入临界段 */
+//	taskEXIT_CRITICAL();
 }
 
 /**
@@ -393,11 +379,11 @@ void BSP_SD_IRQHandler(void)
   */
 void BSP_SD_DMA_Tx_IRQHandler(void)
 {
-		/* 进入临界段 */
-	taskENTER_CRITICAL();
+//		/* 进入临界段 */
+//	taskENTER_CRITICAL();
   HAL_DMA_IRQHandler(uSdHandle.hdmatx); 
-		/* 进入临界段 */
-	taskEXIT_CRITICAL();
+//		/* 进入临界段 */
+//	taskEXIT_CRITICAL();
 }
 
 /**
@@ -406,11 +392,11 @@ void BSP_SD_DMA_Tx_IRQHandler(void)
   */
 void BSP_SD_DMA_Rx_IRQHandler(void)
 {
-		/* 进入临界段 */
-	taskENTER_CRITICAL();
+//		/* 进入临界段 */
+//	taskENTER_CRITICAL();
   HAL_DMA_IRQHandler(uSdHandle.hdmarx);
-		/* 进入临界段 */
-	taskEXIT_CRITICAL();
+//		/* 进入临界段 */
+//	taskEXIT_CRITICAL();
 }
 
 /**
@@ -419,11 +405,10 @@ void BSP_SD_DMA_Rx_IRQHandler(void)
   *          This value can be one of the following values:
   *            @arg  SD_TRANSFER_OK: No data transfer is acting
   *            @arg  SD_TRANSFER_BUSY: Data transfer is acting
-  *            @arg  SD_TRANSFER_ERROR: Data transfer error 
   */
-HAL_SD_TransferStateTypedef BSP_SD_GetStatus(void)
+uint8_t BSP_SD_GetCardState(void)
 {
-  return(HAL_SD_GetStatus(&uSdHandle));
+  return((HAL_SD_GetCardState(&uSdHandle) == HAL_SD_CARD_TRANSFER ) ? SD_TRANSFER_OK : SD_TRANSFER_BUSY);
 }
 
 /**
@@ -431,10 +416,21 @@ HAL_SD_TransferStateTypedef BSP_SD_GetStatus(void)
   * @param  CardInfo: Pointer to HAL_SD_CardInfoTypedef structure
   * @retval None 
   */
-void BSP_SD_GetCardInfo(HAL_SD_CardInfoTypedef *CardInfo)
+void BSP_SD_GetCardInfo(SD_CardInfo *CardInfo)
 {
   /* Get SD card Information */
-  HAL_SD_Get_CardInfo(&uSdHandle, CardInfo);
+  HAL_SD_GetCardInfo(&uSdHandle, CardInfo);
 }
 
+//SDMMC1发送完成回调函数
+void HAL_SD_TxCpltCallback(SD_HandleTypeDef *hsd)
+{
+    TX_Flag=1; //标记写完成
+}
 
+//SDMMC1接受完成回调函数
+void HAL_SD_RxCpltCallback(SD_HandleTypeDef *hsd)
+{
+    //SCB_InvalidateDCache_by_Addr((uint32_t*)Buffer_Block_Rx, MULTI_BUFFER_SIZE/4);
+    RX_Flag=1;
+}

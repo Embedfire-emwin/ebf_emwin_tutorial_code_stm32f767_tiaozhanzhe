@@ -380,11 +380,11 @@ void BSP_SD_MspDeInit(SD_HandleTypeDef *hsd, void *Params)
   */
 void BSP_SD_IRQHandler(void)
 {
-		/* 进入临界段 */
-	taskENTER_CRITICAL();
+//		/* 进入临界段 */
+//	taskENTER_CRITICAL();
   HAL_SD_IRQHandler(&uSdHandle);
-		/* 进入临界段 */
-	taskEXIT_CRITICAL();
+//		/* 进入临界段 */
+//	taskEXIT_CRITICAL();
 }
 
 /**
@@ -393,11 +393,11 @@ void BSP_SD_IRQHandler(void)
   */
 void BSP_SD_DMA_Tx_IRQHandler(void)
 {
-		/* 进入临界段 */
-	taskENTER_CRITICAL();
+//		/* 进入临界段 */
+//	taskENTER_CRITICAL();
   HAL_DMA_IRQHandler(uSdHandle.hdmatx); 
-		/* 进入临界段 */
-	taskEXIT_CRITICAL();
+//		/* 进入临界段 */
+//	taskEXIT_CRITICAL();
 }
 
 /**
@@ -406,11 +406,11 @@ void BSP_SD_DMA_Tx_IRQHandler(void)
   */
 void BSP_SD_DMA_Rx_IRQHandler(void)
 {
-		/* 进入临界段 */
-	taskENTER_CRITICAL();
+//		/* 进入临界段 */
+//	taskENTER_CRITICAL();
   HAL_DMA_IRQHandler(uSdHandle.hdmarx);
-		/* 进入临界段 */
-	taskEXIT_CRITICAL();
+//		/* 进入临界段 */
+//	taskEXIT_CRITICAL();
 }
 
 /**

@@ -23,11 +23,13 @@
 /* FreeRTOS头文件 */
 #include "FreeRTOS.h"
 #include "task.h"
+/* FATFS */
+#include "ff.h"
+#include "ff_gen_drv.h"
+#include "sd_diskio.h"
 /* STemWIN头文件 */
-#include "ScreenShot.h"
 #include "MainTask.h"
 #include "usart/bsp_debug_usart.h"
-
 /*********************************************************************
 *
 *       Defines
@@ -49,7 +51,7 @@
 *
 **********************************************************************
 */
-int t0, t1;
+uint16_t t0, t1;
 static char _acBuffer[1024 * 4];
 static char *_acbuffer = NULL;
 
@@ -121,12 +123,14 @@ static void ShowBMPEx(const char *sFilename, int x0, int y0)
 	{
 		printf("文件打开失败！\r\n");
 	}
-
+	/* 退出临界段 */
+	taskEXIT_CRITICAL();
   
   /* 绘制图片 */
   GUI_BMP_DrawEx(_GetData, &file, x0, y0);
-	  /* 退出临界段 */
-	taskEXIT_CRITICAL();
+  
+  /* 读取完毕关闭文件 */
+	f_close(&file);
 }
 
 /**
